@@ -29,49 +29,135 @@ flowchart LR
 ## Prerequisites
 
 - Node.js 20 or newer
-- PostgreSQL 14 or newer
+- PostgreSQL 14 or newer, or Docker Desktop
 - Expo Go on a phone, or an Android/iOS simulator
 
-## Setup
+## Run locally on Windows
 
-From PowerShell at the repository root:
+### 1. Start PostgreSQL
+
+The easiest local setup is Docker Desktop. Start Docker Desktop, then run this once from PowerShell:
+
+```powershell
+docker run --name miniledger-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=miniledger `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+If the container already exists, start it with:
+
+```powershell
+docker start miniledger-postgres
+```
+
+You can confirm it is running with:
+
+```powershell
+docker ps
+```
+
+### 2. Configure and start the backend
+
+From PowerShell at the repository root, create the local environment file:
 
 ```powershell
 Copy-Item backend\.env.example backend\.env
-# Edit backend\.env and set DATABASE_URL and JWT_SECRET
-Set-Location backend
+```
+
+If you use the Docker command above, the default `DATABASE_URL` in `backend\.env` is already correct. Change `JWT_SECRET` to a long random value before using the app.
+
+Open a new PowerShell window and run:
+
+```powershell
+Set-Location D:\projects\miniledger\backend
 npm install
 npx prisma generate
 npx prisma migrate dev --name init
 npm run dev
 ```
 
-The API runs at `http://localhost:4000`. Swagger UI is at `http://localhost:4000/api/docs`.
-
-For a physical phone, set `EXPO_PUBLIC_API_URL` to the computer's LAN address, for example `http://192.168.1.20:4000/api`, rather than `localhost`.
-
-In another PowerShell window:
+The API runs at [http://localhost:4000](http://localhost:4000). Verify it with:
 
 ```powershell
-Set-Location mobile
+Invoke-RestMethod http://localhost:4000/api/health
+```
+
+Swagger UI is available at [http://localhost:4000/api/docs](http://localhost:4000/api/docs).
+
+### 3. Start the mobile app
+
+Open a second PowerShell window:
+
+```powershell
+Set-Location D:\projects\miniledger\mobile
 npm install
+npx expo start --web
+```
+
+Expo displays a local URL. Open it in your browser, usually [http://localhost:8081](http://localhost:8081). If port 8081 is busy, use the alternate port shown by Expo.
+
+To run on a phone or emulator instead, use:
+
+```powershell
 npx expo start
 ```
 
-## Testing OTP login
+For a physical phone, set `EXPO_PUBLIC_API_URL` to the computer's LAN address, for example `http://192.168.1.20:4000/api`, rather than `localhost`. The phone and computer must be on the same Wi-Fi network.
 
-1. Enter a 10-digit phone number in the app.
-2. Press **Send OTP**.
-3. Read the six-digit OTP printed in the backend terminal.
-4. Enter it and press **Verify OTP**.
+### 4. Sign in
 
-This is deliberately mock authentication. It proves the application flow but is not phone ownership verification and must be replaced by an SMS provider in production.
+1. Enter a 10-digit phone number.
+2. Select **Send OTP**.
+3. Copy the six-digit OTP printed in the backend terminal.
+4. Enter the OTP and select **Verify OTP**.
 
-## Tests
+The dashboard lets you add, view, repay, and attach receipts to loans. Due dates can be entered as `DD-MM-YYYY` or `YYYY-MM-DD`.
+
+### Stop the project
+
+Stop the backend and Expo terminals with `Ctrl+C`. Stop PostgreSQL when needed with:
 
 ```powershell
-Set-Location backend
+docker stop miniledger-postgres
+```
+
+To start it again later:
+
+```powershell
+docker start miniledger-postgres
+```
+
+## Project structure
+
+| Directory | Description |
+| --- | --- |
+| `backend/` | Express API, Prisma schema, migrations, and tests |
+| `mobile/` | Expo SDK 58 React Native app |
+| `docs/` | API reference and interview preparation notes |
+
+### Authentication note
+
+Authentication is deliberately mocked for development. The OTP is printed in the backend terminal; it is not sent by SMS and does not verify phone ownership. A production deployment should replace this flow with an SMS provider and add persistent OTP storage, rate limiting, and stronger account controls.
+
+## Run tests and builds
+
+```powershell
+# Backend tests
+Set-Location D:\projects\miniledger\backend
 npm test
+
+# Backend production build
+npm run build
+
+# Mobile type check
+Set-Location D:\projects\miniledger\mobile
+npx tsc --noEmit
+
+# Expo project checks
+npx expo-doctor
 ```
 
 Tests use an in-memory fake Prisma client and do not delete development data. The API code still uses Prisma in normal runtime.
